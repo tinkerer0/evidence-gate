@@ -15,9 +15,38 @@ Claude Code(및 Claude Agent SDK) 세션용 품질 게이트 스킬입니다. �
 
 자세한 규칙·rubric·예시는 [`SKILL.md`](SKILL.md)에 있습니다.
 
+**Status:** Claude Code 스킬 문서·절차 · `Last reviewed: 2026-07-17` against default-branch source.
+
 ## 선택적 연동 (optional integrations)
 
-이 스킬은 **단독으로 동작**합니다. 본문(`SKILL.md`)에 나오는 `/cross-verify`, `/verify`, `/code-review`, `design-agent` 같은 참조는 같은 환경에 그런 스킬·명령이 있을 때 자동으로 활용하는 **선택적 연동 지점**입니다. 없어도 핵심 게이트(규모 판정 · 증거 rubric · 어휘 통제)는 그대로 작동합니다.
+이 스킬은 **단독으로 동작**합니다. 본문(`SKILL.md`)에 나오는 `/cross-verify`, `/verify`, `/code-review`, `design-agent` 같은 참조는 같은 환경에 그런 스킬·명령이 있을 때 자동으로 활용하는 **선택적 연동 지점**입니다. 없어도 핵심 게이트(규모 판정 · 증거 rubric · 어휘 통제)는 그대로 작동합니다. 위 이름 중 일부 형제 스킬은 **공개 저장소가 아닐 수 있으며**, 이 README는 그에 대한 링크·내부 설명을 추가하지 않습니다.
+
+## 트리거 스모크 · 최소 출력 예
+
+`SKILL.md` frontmatter `description` 기준, 아래 같은 턴에서 게이트가 로드되는 것을 기대합니다(이 refresh에서 런타임을 실행하지 않음 — **미실행 안내**).
+
+| 입력(의도) 예 | 기대 동작(문서 기준) |
+|---|---|
+| 파일 1개를 고치거나 새로 쓰는 턴 | 규모 판정 → 대개 `scale: LIGHT` 선언 후 최소 보고 |
+| `ㅇㅋ` / `진행해` 로 계획된 변경 승인 | 승인 턴도 게이트 대상(본문 description) |
+| `계속` / resume 으로 작업 재개 | 재개·상태 주장 턴도 게이트 대상 |
+| 조회만 하는 질문(파일·상태 변경 없음) | 규모 판정 생략(면제) — 단 §4 어휘 규칙은 유지 |
+
+**LIGHT 최소 출력 스케치** (형식은 `SKILL.md` §3 LIGHT 최소 보고; 값은 예시):
+
+```
+scale: LIGHT — 파일: src/foo.py, 요구: "오타 한 줄 고쳐줘"
+R2 PASS — `git diff --check` exit 0, (TRIVIAL이면 diff hunk 인용으로 R2 대체 가능)
+범위: git diff --stat → "1 file changed"
+요구: "오타 한 줄 고쳐줘"
+```
+
+**FULL 보고 한 줄 예** (`SKILL.md` 보고 형식 예시에서 발췌한 형태):
+
+```
+R2 PASS — `pytest tests/test_x.py -q` exit 0, "12 passed in 1.31s"
+cross-verify: 해당 없음 (§6 트리거 모두 불충족)
+```
 
 ## 설치
 
