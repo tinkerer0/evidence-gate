@@ -1,25 +1,25 @@
 # evidence-gate
 
-Claude Code(및 Claude Agent SDK) 세션용 품질 게이트 스킬입니다. 파일을 만들거나 고치거나, 상태를 바꾸는 명령을 실행하거나, 작업 완료를 보고하는 턴마다 자동으로 로드되어, **작업 규모를 숫자로 판정**하고 모든 "됐다"는 주장을 **실제 명령 출력·diff 인용으로 증명**하게 강제합니다.
+Claude Code(및 Claude Agent SDK) 세션용 품질 게이트 스킬입니다. 파일·상태를 바꾸거나 작업 상태를 주장하는 턴에서 **작업 규모와 변경 귀속을 먼저 고정**하고, 모든 claim을 **claim-specific evidence**에 연결합니다.
 
 핵심 명제는 *"초안은 제출물이 아니라 검토 대상이다"* 이고, 출발점은 *"자기보고는 품질 신호가 아니다"* 입니다 — "확인했습니다"라고 쓰는 비용이 실제 확인 비용보다 훨씬 싸기 때문입니다. 그래서 모든 통과 판정은 진술이 아니라 아티팩트(명령 출력, exit code, diff, 파일:라인)가 내리고, 문장은 그 아티팩트를 인용하는 역할만 합니다.
 
 ## 무엇을 하나
 
-흐름 전체를 무겁게 만들지 않고 두 지점만 고정합니다.
+흐름 전체를 무겁게 만들지 않고 네 지점을 고정합니다.
 
-- **규모 판정** — 변경을 5개 조건(파일 1개 또는 주 파일+테스트/문서 짝 2개·산출물 2개 이하·공개 동작 불변·비가역 작업 없음·diff 수십 줄 이내)으로 세어 LIGHT/FULL을 정합니다. 규모는 상향만 가능하고(래칫), 본문 로드는 세션당 1회입니다.
-- **자기검토 패스** — 초안 직후·보고 직전에, 생성자가 아니라 검토자로 돌아가 입력을 세 가지(원요청·diff·실행 출력)로 제한하고 R0~R6 이진 rubric을 증거와 함께 채웁니다. 증거 칸이 비면 자동 FAIL. 특히 R6은 "만들어 놓고 배선하지 않은 dead code(wiring 누락)"를 잡습니다.
-- **증거·어휘 통제** — 런타임 동작을 단정하는 표현("정상 동작합니다", "should work" 등)은 같은 보고 안에 실행 증거 인용이 있을 때만 허용합니다. 미실행은 UNVERIFIED로 표기하고, 그것이 완료 선언을 대신할 수 없습니다.
-- **막힘 처리 / 외부 검증 라우팅** — 같은 증상으로 2회 실패하면 진단 블록(가설·실험)을 실행하고, 비가역·보안 같은 고위험 변경에서는 외부 교차검증을 제안합니다.
+- **부하 비례** — 좁은 단일 변경과 주 파일+수집되는 test pair만 LIGHT로 두고, 다파일·public contract·외부 상태·고위험·위임 변경은 FULL로 올립니다.
+- **귀속 baseline** — 첫 mutation 전에 scoped `git status --short`를 기록하고, 긴 작업·위임 복귀·compaction 뒤 concurrent change를 재확인합니다.
+- **claim-strength contract** — `VERIFIED`, `INSPECTED`, `UNVERIFIED`, `FAILED`만 사용하며 evidence strength가 claim strength의 상한입니다. static inspection과 dry-run은 runtime/applied-state claim을 `VERIFIED`로 만들지 못합니다.
+- **짧은 감사 가능 보고** — `Changed`, `Claims`, `Evidence`, `Unverified/failed`를 공통으로 쓰고 FULL에서는 `Coverage: Q1→C1/E1`과 `cross-verify:`를 추가합니다. report final은 canonical block에서 조립해 `Changed:`를 첫 token과 첫 non-whitespace line으로 고정하고, 필요한 optional `Scale:`은 그 바로 뒤에 한 번만 둡니다. baseline-dirty attribution은 해당 `INSPECTED` scope claim에만 두며 block 앞뒤에는 prose를 두지 않습니다.
 
-자세한 규칙·rubric·예시는 [`SKILL.md`](SKILL.md)에 있습니다.
+자세한 절차와 report shape는 [`SKILL.md`](SKILL.md)에 있습니다.
 
-**Status:** Claude Code 스킬 문서·절차 · `Last reviewed: 2026-07-17` against default-branch source.
+**Status:** Claude Code 스킬 문서·절차 · `Last reviewed: 2026-07-22` against default-branch source.
 
 ## 선택적 연동 (optional integrations)
 
-이 스킬은 **단독으로 동작**합니다. 본문(`SKILL.md`)에 나오는 `/cross-verify`, `/verify`, `/code-review`, `design-agent` 같은 참조는 같은 환경에 그런 스킬·명령이 있을 때 자동으로 활용하는 **선택적 연동 지점**입니다. 없어도 핵심 게이트(규모 판정 · 증거 rubric · 어휘 통제)는 그대로 작동합니다. 위 이름 중 일부 형제 스킬은 **공개 저장소가 아닐 수 있으며**, 이 README는 그에 대한 링크·내부 설명을 추가하지 않습니다.
+이 스킬은 **단독으로 동작**합니다. `/cross-verify`, `/deep-verify`, `/verify`, `/code-review`, `design-agent` 참조는 같은 환경에 있을 때만 쓰는 선택적 연동 지점입니다. 없어도 규모 판정, 귀속 baseline, claim-evidence 계약은 그대로 동작합니다. 일부 형제 스킬은 공개 저장소가 아닐 수 있어 링크나 내부 설명을 추가하지 않습니다.
 
 ## 트리거 스모크 · 최소 출력 예
 
@@ -27,25 +27,43 @@ Claude Code(및 Claude Agent SDK) 세션용 품질 게이트 스킬입니다. �
 
 | 입력(의도) 예 | 기대 동작(문서 기준) |
 |---|---|
-| 파일 1개를 고치거나 새로 쓰는 턴 | 규모 판정 → 대개 `scale: LIGHT` 선언 후 최소 보고 |
+| 파일 1개를 고치거나 새로 쓰는 턴 | 규모 판정 → 대개 `scale: LIGHT` 선언 후 claim-linked 보고 |
 | `ㅇㅋ` / `진행해` 로 계획된 변경 승인 | 승인 턴도 게이트 대상(본문 description) |
 | `계속` / resume 으로 작업 재개 | 재개·상태 주장 턴도 게이트 대상 |
 | 조회만 하는 질문(파일·상태 변경 없음) | 규모 판정 생략(면제) — 단 §4 어휘 규칙은 유지 |
 
-**LIGHT 최소 출력 스케치** (형식은 `SKILL.md` §3 LIGHT 최소 보고; 값은 예시):
+**LIGHT canonical example** (placeholder-only; optional `Scale:` 위치 포함; 마지막 표시 줄에서 응답 종료):
 
 ```
-scale: LIGHT — 파일: src/foo.py, 요구: "오타 한 줄 고쳐줘"
-R2 PASS — `git diff --check` exit 0, (TRIVIAL이면 diff hunk 인용으로 R2 대체 가능)
-범위: git diff --stat → "1 file changed"
-요구: "오타 한 줄 고쳐줘"
+Changed: `<current-turn-path>`, `<current-turn-test-path>`
+Scale: LIGHT — `<optional-scale-basis>`
+Claims:
+- C1 VERIFIED — E1 (<tested-runtime-behavior>)
+- C2 INSPECTED — E2 (<static-change-and-scope>; `<baseline-dirty-path>` is pre-existing and was not changed in the current turn)
+- C3 UNVERIFIED (execution did not occur in `<requested-environment>`)
+Evidence:
+- E1 `<behavior-check>` (cwd: `<cwd>`, exit 0) — "<one-decisive-output-line>"
+- E2 `<scope-check>` (cwd: `<cwd>`, exit 0) — "<one-decisive-output-line>"
+Unverified/failed:
+- C3 UNVERIFIED — execution did not occur in `<requested-environment>`; next check: run `<environment-check>` in `<requested-environment>`.
 ```
 
-**FULL 보고 한 줄 예** (`SKILL.md` 보고 형식 예시에서 발췌한 형태):
+**FULL output shape** (placeholder-only; optional `Scale:` 위치 포함; 마지막 표시 줄에서 응답 종료):
 
 ```
-R2 PASS — `pytest tests/test_x.py -q` exit 0, "12 passed in 1.31s"
-cross-verify: 해당 없음 (§6 트리거 모두 불충족)
+Changed: `<current-turn-path-a>`, `<current-turn-path-b>`
+Scale: FULL — `<optional-scale-basis>`
+Coverage: Q1→C1/E1; Q2→C2/E2; Q3→C3(UNVERIFIED)
+Claims:
+- C1 VERIFIED — E1 (<tested-runtime-behavior>)
+- C2 INSPECTED — E2 (<static-change-and-scope>)
+- C3 UNVERIFIED (execution did not occur in `<requested-environment>`)
+Evidence:
+- E1 `<behavior-check>` (cwd: `<cwd>`, exit 0) — "<one-decisive-output-line>"
+- E2 `<scope-check>` (cwd: `<cwd>`, exit 0) — "<one-decisive-output-line>"
+Unverified/failed:
+- C3 UNVERIFIED — execution did not occur in `<requested-environment>`; next check: run `<environment-check>` in `<requested-environment>`.
+cross-verify: 해당 없음 (§6 트리거 불충족) | 제안 — <trigger>
 ```
 
 ## 설치

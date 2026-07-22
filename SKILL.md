@@ -1,102 +1,145 @@
 ---
 name: evidence-gate
-description: "Mandatory gate for any turn that creates or modifies files, runs a state-changing command or tool call (incl. MCP writes and delegated work), or claims work status — however trivial (body scales LIGHT vs FULL). Includes approval turns green-lighting planned work (ㅇㅋ, 진행해, do it) and continuation/post-compaction turns (계속, resume). If a read-only turn becomes an edit, load before the first mutation. Not for pure questions or research with no change and no status claim."
+description: "Mandatory gate for any turn that creates or modifies files, runs a state-changing command or tool call (incl. MCP writes and delegated work), or claims work status — however trivial (body scales LIGHT vs FULL). Includes approval turns green-lighting planned work (ㅇㅋ, 진행해, do it) and continuation/post-compaction turns that resume work or claim status (계속, resume). If a read-only turn becomes an edit, load before the first mutation. Not for pure questions or research with no change and no status claim."
 ---
 
 # evidence-gate — 초안은 제출물이 아니라 검토 대상이다
 
 ## 0. 원칙 — 자기보고 무효
 
-모든 통과 판정은 아티팩트(명령 출력, exit code, diff, 파일:라인)가 내리고, 문장은 그 아티팩트를 인용하는 역할만 한다.
+모든 판정은 아티팩트(명령 출력, exit code, diff, 파일:라인)가 내린다. 문장은 claim을 아티팩트에 연결할 뿐이다.
 
 세션 내 재로드 불요 — 본문이 컨텍스트에 있으면 로드 없이 따른다. 단 compaction 요약을 거쳤거나 resume으로 시작한 세션이면 이후 첫 게이트 적용 턴에 1회 재로드하고, 그 외에도 §2 done-check 사다리 5단을 원문으로 인용할 수 없으면 유실로 간주해 재로드한다.
 
-지각 로드(late-entry)·유실 후 재로드는 면제가 아니다: 규모·닻·done-check를 원요청 문구에서 소급 구성하고 보고에 `done-check 사후 선정`을 표기한 뒤 §3(LIGHT면 최소 보고)을 그대로 수행한다 — 세부 절차는 §1 래칫과 동일.
+지각 로드(late-entry)·유실 후 재로드는 면제가 아니다: 소급 기준과 보고 표기는 §1 래칫을 따른다.
 
 ## 1. 규모 판정 — "간단함"은 기분이 아니라 숫자다
 
-**변경의 정의 (수단 불문).** Edit/Write/NotebookEdit만이 아니라 파일·상태를 변이시키는 모든 수단이 변경이다: Bash/PowerShell 리다이렉션·heredoc, 패키지 설치(lockfile 변이), git working tree·히스토리 조작, 스크립트 실행으로 파일 생성, 외부 리소스 변이(MCP 쓰기·위임 작업 포함). 상태를 변이시킬 수 있는 명령 실행은 면제 대상이 아니다.
+**변경의 정의.** 파일·상태를 변이시키는 모든 수단이 변경이다: Edit/Write, shell write, package·lockfile 변이, git working tree·history 조작, 외부 리소스 쓰기, 위임 작업. 상태변경 명령 실행도 포함한다.
 
-**면제.** 변경이 없는 턴(조회·설명·검색, 변이 없는 명령 실행)은 규모 판정을 생략한다. 단 변이성 툴 호출이 있는 턴에서 첫 호출보다 앞선 scale 선언이 transcript에 없으면 그 자체가 위반이다. §4 어휘 규칙(런타임 동작·완료 단정)은 변경 유무와 무관하게 모든 답변에 적용되고, 답변에 사용자가 그대로 실행할 의도의 비가역·상태변경 명령/코드를 담으면 §4 관찰 규칙도 적용한다 — 미관찰 식별자·경로·플래그는 인라인 '미확인' 표기, 제안 전체의 UNVERIFIED 라벨은 핵심 실행 경로가 미관찰일 때만(애매하면 UNVERIFIED).
+**면제.** 조회·설명·검색처럼 변이가 없으면 scale을 생략한다. 조회가 변경으로 바뀌면 첫 mutation 직전에 판정한다. §4의 claim 어휘와 증거 상한은 변경 유무와 무관하게 적용한다.
 
-**판정 단위.** 규모는 사용자 요청(턴) 전체 기준으로 한 번 판정한다. 하나의 요청을 여러 LIGHT로 분할 선언할 수 없고, 작업을 나눠 실행해도 규모 판정과 rubric은 요청 전체를 덮는다.
+**판정 단위.** 사용자 요청 전체를 한 번 판정하고 여러 LIGHT로 쪼개지 않는다. 아래가 모두 참일 때만 LIGHT다.
 
-변경이 있으면 아래 다섯 조건을 센다. 전부 참이면 LIGHT, 하나라도 거짓이면 FULL. 세는 데 판단이 필요해지는 순간 그 조건은 거짓이다 — 동률은 FULL.
+- 파일 1개, 또는 주 파일과 테스트 러너가 수집하는 직접 test pair 1개까지다.
+- 따로 확인할 산출물이 2개 이하다.
+- public behavior·signature·schema와 외부 상태를 바꾸지 않는다.
+- 비가역·보안·비용·PHI·위임 변경이 없다.
+- 변경이 심볼 1~2개와 수십 줄 이내이고 별도 판단이 필요 없다.
 
-- 변경할 파일이 1개다(신규 생성 포함) — 또는 2개이되 2개째가 주 파일의 짝일 때: 테스트 러너가 수집하는 주 파일의 테스트 파일, 또는 주 파일 변경 내용을 그대로 기술하는 문서. 짝 여부에 판단이 필요하면 FULL. 읽는 파일 수는 규모와 무관하다.
-- 충족 여부를 따로 확인해야 하는 산출물이 2개 이하다. 변경에 따라오는 암묵 산출물(테스트 갱신, 문서 동기화)도 센다.
-- 기존 함수 시그니처, 공개 동작, 설정 스키마를 바꾸지 않는다. 공개 동작이란 편집 파일 밖에서 호출·참조되거나 기존 테스트가 고정한 동작이다 — "internal이라서"는 면제 사유가 아니고, 그 정의 밖 동작(명세된 버그의 수정 자체)은 이 조건을 깨지 않는다.
-- 비가역 작업이 없다 (삭제, `git reset --hard`, force push, 비용이 드는 외부 호출).
-- 변경이 심볼 1~2개, 예상 diff 수십 줄 이내다.
+**래칫.** 그 밖의 다파일, public contract, 외부 write, 고위험 변경, 위임 결과, 판단이 필요한 범위는 FULL이다. 조회→변경, 범위 확장, 편집 파일 밖 caller 발견, late-entry는 상향 트리거다. 건너뛴 닻은 원요청에서 소급하고 `done-check 사후 선정`을 표기한다.
 
-**선언 형식.** FULL은 한 줄: `scale: FULL — 파일 3개, 산출물 2개`. LIGHT는 과소 카운팅이 선언에서 드러나도록 적는다: `scale: LIGHT — 파일: <경로>[ + <짝 경로> (짝: 테스트/문서)], 요구: "<요청에서 인용한 구절>"`.
+선언은 `scale: LIGHT — 파일: <path>[ + <test path> (짝: test pair)], 요구: "<원문>"` 또는 `scale: FULL — 파일 <n>개, 요구 <n>개`로 남긴다.
 
-**TRIVIAL 변형.** 실행 의미가 없는 변경(주석, 문서 산문, 문자열 오타 등 비실행 텍스트)이고 파일 1개면, LIGHT에서 R2를 생략하고 편집 hunk의 diff 인용 한 줄을 증거로 보고한다. UNVERIFIED 라벨은 "실행됐어야 하는데 안 된 것"에만 쓴다 — 라벨의 신호 가치를 오타 수정으로 희석하지 않는다.
+**TRIVIAL.** 실행 의미가 없는 단일 파일 산문·주석·오타 변경은 diff로 확인한 content/scope claim에 `INSPECTED`까지만 부여한다. runtime claim을 만들지 않는다.
 
-**래칫.** 규모는 상향만 가능하고 하향은 불가능하다. 승격 트리거: 선언한 범위 밖 파일을 변경하게 될 때(읽기는 무관), diff가 예상 범위를 넘을 때, 편집 파일 밖 호출자를 발견했을 때, 조회로 시작한 작업이 변경으로 전환될 때(첫 변이성 툴 호출 직전에 규모 판정이 발동한다), 스킬이 작업 도중·초안 완성 후에야 로드됐을 때(§0). 승격 시 건너뛴 닻을 소급 작성하되, 소급 done-check는 이미 쓴 코드가 아니라 원요청의 요구 문구에서 도출하고 보고에 `done-check 사후 선정 — 요구 n 기준`을 표기한다. "이미 반쯤 했으니 그냥 가자"가 이 스킬이 막는 패턴이다.
+**고정 안전 규칙.** 편집 전에 대상을 읽는다. 단 `.env`, credentials, private material은 내용을 읽지 말고 targeted edit만 한다. 비가역 작업 직전에는 복구 지점을 만들고 종료 시 임시 백업을 정리한다.
 
-**규모 무관 고정 규칙.** (a) 비가역 작업 직전에는 복구 지점을 만든다: git 환경이면 `git stash create`, 비 git이면 대상 파일의 백업 사본(작업 종료 시 정리). (b) §2의 read-before-write와 §4의 증거 규칙은 LIGHT에도 적용된다.
+**Enclosing harness tool boundary.** harness나 task contract가 금지 shell-write construct/token 목록을 주면, contract-listed target path를 참조하는 Bash command의 모든 segment에는 그 token을 하나도 넣지 않는다. read-only stderr suppression인 `2>/dev/null`도 예외가 아니다. inspection은 별도 command로 나누거나 Read tool을 사용하고, 목록에 없는 safe exception을 추론하지 말고 literal tool boundary를 따른다. 단 contract가 exact command를 verbatim으로 명시하면 그 command는 정확히 그대로 실행하며, 이 token rule은 명시적으로 mandated exact command를 override하지 않는다.
 
 ## 2. 본 흐름 — 닻 네 개
 
-FULL일 때 착수 시 네 가지를 적는다. 표가 아니라 몇 줄이면 충분하다.
+FULL은 첫 mutation 전에 네 가지를 고정한다. LIGHT도 범위 baseline과 직접 check는 생략하지 않는다.
 
-1. **요구 목록** — 원요청에서 요구를 표현한 구절을 각각 인용하고 번호를 매긴다. 이 인용-번호 매핑이 §3 R0/R1의 행이 된다. "요청 처리" 같은 한 덩어리 분해는 R0에서 FAIL이다.
-2. **done-check** — 이 변경이 잘못됐다면 무엇이 잡아낼지, pass/fail 신호를 낼 명령 하나를 코딩 전에 고정한다(끝에 가서 고르면 이미 한 작업이 통과할 체크를 고르게 된다). 사다리: (1) 프로젝트 테스트 러너 (2) build/compile (3) parse/lint 체크(`python -m py_compile`, `node --check`, PS parser) (4) import-only 실행·dry-run (5) 산출물 존재·형식 확인(`Test-Path`, schema validator). `없음` 선언 = (5)까지 불가한 사유 한 줄 — 사다리 검토 없는 `없음`은 R2 FAIL이고, 정당한 `없음`은 그 보고가 §4 UNVERIFIED 규칙을 받는다는 수락이다.
-3. **범위 선언** — 변경할 파일 목록. 완료 시 R3에서 대조한다.
-4. **결정점 목록** — 합리적 대안이 둘 이상 실재하는 갈림길(라이브러리·스키마·삭제 범위 등)을 전부 나열하고, 추천안을 달아 일괄 질문한 뒤 명시적 go 전에는 지나가지 않는다. "기본값 채택 후 통보"라는 범주는 없다. 기존 관례를 그대로 따르는 무선택 지점만 결정점이 아니다.
+1. **요구 목록** — 원요청의 요구 구절을 인용하고 `Q1`, `Q2`처럼 번호를 매긴다. 한 덩어리로 뭉개지 않는다.
+2. **done-check** — FULL은 requirement/claim마다 `check + expected observable`을 미리 정한다. 하나의 green test를 전체 완료 증거로 쓰지 않는다.
 
-편집 대상 심볼의 정의 전체를 Read하지 않은 편집은 §3에서 증거가 될 수 없다. 시그니처나 동작을 바꾸면 사용처를 Grep해서 영향 범위를 적는다.
+   **done-check 사다리 5단**: (1) 프로젝트 test runner (2) build/compile (3) parser/lint (4) import-only·dry-run (5) 산출물 존재·형식 확인. 위 단계 중 가능한 가장 강한 check를 고르고, 어느 것도 불가능하면 이유와 해당 claim의 `UNVERIFIED`를 미리 수락한다.
 
-plan mode가 활성이면 이 닻 네 개를 plan 문서 안에 포함시켜 제시하고, 승인 후 본 작업을 시작한다 — 닻을 별도로 중복 작성하지 않는다.
+   claim type별 최소 적합성은 다음과 같다.
+
+   - content/format → scoped diff와 해당 parser·schema·render check
+   - parser/build → 실제 parser·build command
+   - targeted behavior → 해당 behavior를 실행하는 targeted test
+   - integration/compatibility → 해당 integration·환경에서의 check
+   - wiring/entrypoint → 기존 caller·registry·entrypoint 관찰, runtime claim이면 실행까지
+   - external write → 목적지 read-after-write
+   - delegated work → §4 provenance 규칙
+3. **범위 선언** — 정확한 변경 경로를 적고, 첫 mutation 전에 target scope의 `git status --short`와 필요 시 scoped diff/name list를 attribution baseline으로 기록한다. 기존 dirty path를 자기 작업으로 주장하지 않는다. 긴 작업, 위임 복귀, compaction 뒤에는 이 baseline과 편집 대상의 마지막 관찰을 concurrent-change recheck로 다시 확인한다. 마지막 관찰 뒤 같은 target이 예상 밖으로 바뀌면 쓰기를 멈추고 충돌을 보고한다. baseline이 없거나 타 세션 변경과 귀속을 분리할 수 없으면 scope claim은 `UNVERIFIED`다.
+4. **결정점 목록** — 합리적 대안이 둘 이상인 갈림길과 추천안을 한 번에 제시하고 명시적 go 전에는 지나가지 않는다. 기존 관례를 그대로 따르는 무선택 지점은 결정점이 아니다.
+
+편집 대상 정의를 먼저 읽고, signature·behavior 변경이면 사용처와 영향 범위를 관찰한다. plan mode에서는 네 닻을 plan에 포함하고 중복 작성하지 않는다.
 
 ## 3. 자기검토 패스 — 초안 직후, 보고 직전
 
-초안이 완성되어도 바로 보고하지 않는다. 생성자가 아니라 검토자로, 입력을 아티팩트로 제한하고 출력을 이진 rubric으로 제한해 다시 읽는다. 검토 입력은 세 가지뿐이며, 작업하며 생긴 "내가 한 것 같은" 기억은 입력이 아니다.
+초안 뒤에는 기억을 버리고 다음 세 입력만 다시 읽는다.
 
-- **원요청 원문** — 다시 읽는다. re-read의 산출물은 R0의 델타 판정이다(읽었다는 주장은 증거가 아니다).
-- **diff** — `git diff` 출력. 비 git이면 편집한 hunk ± 주변 수십 줄만 다시 Read한다(파일 전체 재독 불요).
-- **done-check 실행 출력** — 마지막 편집 이후 실행분. 없으면 지금 돌린다.
+- 원요청 원문과 `Qn` 매핑
+- 마지막 mutation 이후의 scoped diff/status 또는 비 git 변경 ledger
+- 마지막 mutation 이후의 claim별 check 출력
 
-**신선도 규칙.** R2·R3·R6의 증거는 마지막 파일 편집(Edit/Write/파일을 쓰는 명령) 이후에 일어난 도구 호출의 출력이어야 한다. 편집→재실행 순서가 한 번이라도 깨졌으면 이전 출력은 증거로 무효다. R4는 조건부 예외 — 관찰 소스가 이번 diff·세션 변경 ledger의 대상 목록에 없고(대조 한 줄 명시), 관찰 이후 그 소스에 영향 줄 환경 변이(패키지 설치·업그레이드·버전 전환)가 없었으면 세션 내 기존 도구 출력을 증거로 인정한다.
+누락을 고치면 관련 diff/status/check를 다시 관찰한다. 고치지 못한 항목은 숨기지 말고 해당 status로 보고한다. 검토 범위는 정확성과 명시 요구이며 요청 밖 리팩터링을 추가하지 않는다.
 
-**transcript 앵커.** 증거 인용은 이 세션 도구 호출 출력에 원문 그대로(verbatim) 존재해야 한다. 대응하는 도구 호출을 transcript에서 가리킬 수 없는 인용은 증거가 아니라 위조로 간주한다. rubric은 done-check 결과를 받은 그 턴에서 곧바로 작성한다 — 기억으로 나중에 채우지 않는다.
+**공통 report boundary.** 최종 top-level 응답은 산문·제목·preamble 없이 첫 줄부터 `Changed:`로 시작한다. 첫 줄에는 이번 턴에 실제로 mutate한 path만 각각 backtick으로 감싸 comma-separated로 쓰거나, 변경이 없으면 정확히 `Changed: 없음`만 쓴다. 이 줄에 설명·괄호·귀속 문구·unchanged path를 넣지 말고 모두 아래 claim/evidence entry로 내린다. acknowledgement, attribution 설명, status recap을 포함한 어떤 prose도 `Changed:` 앞에 둘 수 없다.
 
-rubric은 전 항목 이진 판정 + 증거다. PASS의 증거는 위치 참조만으로는 무효이고, 해당 아티팩트에서 복사한 라인 원문을 최소 1줄 포함해야 한다. 증거가 비거나 항목이 누락되면 자동 FAIL — "확인했음"은 증거가 아니다. 형식은 표 또는 R# 줄 목록 어느 쪽이든 되고, N/A 항목은 사유를 명시해 한 줄로 병합할 수 있다("N/A: R4·R5·R6 — 외부참조/시그니처 변경/신규 심볼 없음") — 생략은 FAIL, 병합은 명시 표기만.
+**Mandatory final-send preflight.** report-producing final은 prose draft가 아니라 아래 canonical block에서 직접 조립한다. 첫 emitted token은 literal `Changed:`여야 하고 첫 non-whitespace line도 `Changed:` line이어야 한다. send 직전에 첫 non-whitespace line을 기계적으로 검사한다. 그것이 `Changed:` line이 아니면 최초 `Changed:` line 앞의 모든 line을 삭제하고 다시 검사하며, 기존 prose 아래에 report를 하나 더 append하는 방식으로 고치지 않는다. 삭제한 prose에 다른 곳에 없는 required content가 있었다면 버리지 말고 적절한 claim/evidence entry로 옮긴 뒤 재검사한다. 이 preflight는 report-producing final에만 적용하며 pre-work decision point, diagnostic, 그 밖의 non-report turn에는 적용하지 않는다.
 
-- **R0** — 원요청 재독 후 델타 1줄: "인용 n개 = R1 행 n개" 대응 수치를 명시한다. 재독에서 R1 행 없는 요구 구절이 발견되면 그 자리에서 R1 행을 신설하고(미구현이면 FAIL), 요구가 중도에 바뀐 경우에만 갱신 매핑을 작성한다.
-- **R1.n** — 하위 요구 n이 구현됐다(요구마다 한 행). 증거: 닻1의 원요청 인용 구절 + diff hunk의 변경 라인 원문 1줄 + 파일:라인.
-- **R2** — done-check가 마지막 편집 이후 실행·통과했다 (PASS/FAIL/UNVERIFIED). 증거: 명령 원문 + exit code + 판정 라인 원문.
-- **R3** — diff가 선언한 범위 안이다. 증거: `git diff --stat` 원문 / 비 git: 세션 변경 ledger(이 세션에서 파일을 변경한 모든 도구 호출의 대상 경로를 빠짐없이 열거한 목록). 선언 외 파일이 diff/ledger에 있으면 기본값은 FAIL — 작업 중 그 시점에 범위 갱신을 transcript에 선언해 둔 경우에만 PASS이고, 사후 사유는 FAIL 판정과 함께 적는다.
-- **R4** — 변경이 참조하되 정의하지 않는 식별자·경로·플래그가 관찰됐다(외부 참조 없으면 N/A). 기존 심볼·라이브러리 API·CLI 플래그·경로·버전을 이 변경에서 작성하지 않은 소스(기존 코드, lockfile, `--help` 출력, 문서 fetch)에서 관찰한다. 방금 내가 만든 식별자를 방금 쓴 파일에서 관찰하는 것은 정보량 0 — 불인정.
-- **R5** — 시그니처·동작 변경의 사용처가 갱신됐다(변경 없으면 N/A). 증거: Grep 결과 N건 + 처리 내역.
-- **R6** — 새 함수·클래스·설정·핸들러가 호출·등록·연결됐다(신규 심볼 없으면 N/A). 잡는 것은 가장 조용한 실패 — 배선하지 않은 dead code다. 인용 라인이 def/class/등록 선언 자체이거나 주석·문자열 내부면 증거 무효. 호출부가 이번에 새로 만든 코드라면 기존 코드(이번 diff 밖) 또는 알려진 entry point에 닿을 때까지 호출 체인을 한 단계씩 따라가 각 단계를 인용한다.
+**Scale placement.** scale을 mutation 전 non-final turn에서 이미 선언했다면 report final에서 반복하지 않는다. 그런 선언이 없고 final에 scale을 포함한다면 정확히 한 줄의 `Scale: LIGHT — ...` 또는 `Scale: FULL — ...`만 허용하며, `Changed:` 바로 뒤이자 `Coverage:`/`Claims:` 앞이 유일한 위치다.
 
-보고 형식 예시(FAIL을 숨기지 않은 예; 인용은 전부 실제 도구 출력에서 복사):
+**Report terminator.** report를 생성하는 turn의 final top-level response 전체가 report block이다. LIGHT는 마지막 `Unverified/failed` content 직후, FULL은 마지막 `cross-verify:` line 직후 종료한다. 그 뒤에 heading, recap, appendix, “honest answer”, caveat, 또는 어떤 prose도 추가하지 않는다. 이 규칙은 pre-work decision point, diagnostic, non-report turn을 억제하지 않는다.
 
+**Claim ledger.** Runtime behavior, static content/change/scope, 명시적으로 요청됐지만 실행하지 않은 environment/platform은 서로 다른 atomic claim이다. Claim ID는 보고에 존재하는 status만 `VERIFIED` → `INSPECTED` → `UNVERIFIED` → `FAILED` 순서로 배정한다. status와 evidence entry를 모두 공유하는 claim은 합친다. 모든 `VERIFIED`와 `INSPECTED` claim은 실제로 존재하는 `E#`를 참조해야 하며 file/line이나 산문만 인용할 수 없다. 논의하는 baseline-dirty path의 귀속 설명은 적용 가능한 `INSPECTED` scope claim 안에만 두고, 그 claim에 literal `pre-existing` 또는 `기존 변경`과 "이번 턴에는 변경하지 않았다"는 진술을 함께 넣는다. 별도 claim이나 report 앞 prose로 밀어내지 않는다. "already present"나 "세션 시작부터 있었다"만으로는 귀속되지 않는다.
+
+명시적으로 요청된 모든 environment/platform은 claim ledger에 남긴다. 명시적으로 물은 미실행 environment/platform의 답은 해당 `UNVERIFIED` claim과 그 `Unverified/failed` entry에만 둔다. ledger 뒤에서 답을 재서술하지 않는다. `should work`, `behave the same`, `identical`, `likely portable` 또는 동등한 prediction은 `not verified`, `expectation` 같은 disclaimer가 붙어도 금지한다. 미실행 environment를 이름 붙인 line에는 `UNVERIFIED` status token과 execution이 일어나지 않았다는 사실만 쓰고, `VERIFIED`, `not verified`, `검증됨`, `확인 완료`, `아직 검증 안 됨`처럼 positive, negated, hedged completion vocabulary를 쓰지 않는다. `UNVERIFIED`나 `FAILED` claim이 하나라도 있으면 `Unverified/failed`에 `C#`, 이유, 다음 check를 적고 `없음`이라 쓰지 않는다. 다음 check는 `run <check> in <env>`처럼 아직 수행하지 않은 action으로만 표현한다.
+
+각 evidence entry는 exact command, 모호할 때 cwd, exit code와 도구가 내보낸 decisive output **한 줄**의 verbatim quote만 담는다. 여러 줄을 합치거나 line break를 literal `\\n`으로 쓰거나 normalize·요약하지 않는다.
+
+**LIGHT canonical example (placeholder-only; Scale line은 위 조건에서만 optional; 마지막 표시 줄이 report terminator)**
+
+```text
+Changed: `<current-turn-path>`, `<current-turn-test-path>`
+Scale: LIGHT — `<optional-scale-basis>`
+Claims:
+- C1 VERIFIED — E1 (<tested-runtime-behavior>)
+- C2 INSPECTED — E2 (<static-change-and-scope>; `<baseline-dirty-path>` is pre-existing and was not changed in the current turn)
+- C3 UNVERIFIED (execution did not occur in `<requested-environment>`)
+Evidence:
+- E1 `<behavior-check>` (cwd: `<cwd>`, exit 0) — "<one-decisive-output-line>"
+- E2 `<scope-check>` (cwd: `<cwd>`, exit 0) — "<one-decisive-output-line>"
+Unverified/failed:
+- C3 UNVERIFIED — execution did not occur in `<requested-environment>`; next check: run `<environment-check>` in `<requested-environment>`.
 ```
-R1.3 "CHANGELOG에 반영해줘" FAIL — 증거 없음(누락), R3과 일치
-R2 PASS — `pytest tests/test_x.py -q` exit 0, "12 passed in 1.31s" (마지막 편집 후 실행)
-R3 PASS — `git diff --stat` "2 files changed" — CHANGELOG 미변경은 R1.3 FAIL로 보고
-cross-verify: 해당 없음 (§6 트리거 모두 불충족)
+
+**FULL 보고 형식 (placeholder-only; Scale line은 위 조건에서만 optional; 마지막 표시 줄이 report terminator)**
+
+```text
+Changed: `<current-turn-path-a>`, `<current-turn-path-b>`
+Scale: FULL — `<optional-scale-basis>`
+Coverage: Q1→C1/E1; Q2→C2/E2; Q3→C3(UNVERIFIED)
+Claims:
+- C1 VERIFIED — E1 (<tested-runtime-behavior>)
+- C2 INSPECTED — E2 (<static-change-and-scope>)
+- C3 UNVERIFIED (execution did not occur in `<requested-environment>`)
+Evidence:
+- E1 `<behavior-check>` (cwd: `<cwd>`, exit 0) — "<one-decisive-output-line>"
+- E2 `<scope-check>` (cwd: `<cwd>`, exit 0) — "<one-decisive-output-line>"
+Unverified/failed:
+- C3 UNVERIFIED — execution did not occur in `<requested-environment>`; next check: run `<environment-check>` in `<requested-environment>`.
+cross-verify: 해당 없음 (§6 트리거 불충족) | 제안 — <trigger>
 ```
 
-**LIGHT 최소 보고.** 표 대신 다음을 넣는다: R2 한 항목(증거 포함; TRIVIAL은 diff hunk 인용으로 대체) + 범위 증거 한 줄(`git diff --stat` 원문 또는 세션 변경 ledger) + 요구가 n개면 원요청 인용 n줄. 범위 증거에 선언 밖 파일이 나타나면 그 자체가 FULL 승격 트리거이며, 소급 닻 없이 보고하면 R3 FAIL과 동급이다. 새 심볼을 만들었으면 R6을, 이 세션에서 처음 참조한 외부 식별자·플래그·경로가 있으면 R4를 증거 포함으로 더한다.
+두 형식 모두 `Changed`, `Claims`, `Evidence`, `Unverified/failed`를 포함한다. 빈 섹션은 `Evidence: 없음`처럼 한 줄로 합친다. FULL은 모든 요구를 `Coverage: Q1→C1/E1; Q2→C2/E2; ...`로 연결하고 evidence가 없으면 `Qn→Cn(UNVERIFIED)`로 남긴다. LIGHT에는 `Coverage`와 `cross-verify`를 강제하지 않는다.
 
-**FAIL 처리.** 길은 두 갈래뿐이다: 고치거나, FAIL인 채로 보고서에 그대로 적는다. 항목을 조용히 빼거나 PASS로 바꾸는 세 번째 길은 없다. 고친 경우 — diff가 변했으므로 — 최소 R3와, 수정된 파일을 증거로 갖는 모든 행을 신선도 규칙대로 재실행한다. 확신 낮은 의심도 전부 보고에 올린다('추정' 라벨 명시).
-
-**검토 스코프.** 정확성과 명시된 요구사항으로 제한한다. 스타일 선호, "이왕이면" 개선, 요청 밖 리팩터링은 대상이 아니다. 발견 없음도 유효한 결과다.
-
-**cross-verify 점검 라인.** FULL 보고에는 rubric 아래에 `cross-verify: 해당 없음(§6 트리거 불충족)` 또는 `cross-verify: 제안 — <해당 트리거>` 한 줄을 반드시 적는다. 이 줄이 없는 FULL 보고는 불완전한 보고다.
+TRIVIAL은 diff-backed `INSPECTED`만 보고한다. `UNVERIFIED`나 `FAILED`가 하나라도 있으면 전체 완료를 선언하지 않고 부분 성공으로 쓴다.
 
 ## 4. 증거와 어휘 — 무엇이 "사실"인가
 
-- **인용은 복사다.** 명령 원문, exit code, 판정 라인("3 passed, 1 failed")을 그대로 붙인다. 요약·재구성한 출력은 인용이 아니다. 인용이 먼저, 판정이 나중이다.
-- **어휘는 의미 기준이다.** 런타임 동작을 단정하는 모든 서술은 — "검증됨" 계열이든 "반영했습니다", "이제 정상 동작합니다", "문제 없을 겁니다", "should work" 같은 동의·우회 표현이든, 한국어든 영어든 — 같은 보고 안의 실행 증거 인용이 있을 때만 쓸 수 있다. 단어 목록은 예시이지 회피 가능한 전체 집합이 아니다.
-- **UNVERIFIED는 완료 선언이 될 수 없다.** R2가 UNVERIFIED인 보고는 첫 줄에 UNVERIFIED를 올리고, done/완료/됐다 계열 어휘 없이 "변경했으나 미실행 — 사유: ..." + 검증 방법 제안 + 사용자 결정 대기로 끝낸다. UNVERIFIED는 실패가 아니라 정직이지만, 정직이 완료를 대신하지는 않는다.
-- **관찰 규칙의 스코프.** 이 워크스페이스의 파일·심볼·설정·실행 결과에 대한 서술은 이 세션 도구 출력에서의 관찰이 필요하다. 일반 기술 지식(표준 CLI 플래그, 라이브러리 API)은 사실/추정 라벨을 명시해 서술하되, 그 답변에 근거해 비가역 작업이 실행될 상황이면 실측을 권한다.
-- **done-check 치환 금지.** R2의 PASS는 §2에서 선언된 명령 원문의 실행에만 부여한다. 치환·축소했다면 사유와 함께 `PASS(축소)` 또는 UNVERIFIED로 구분 표기한다.
-- **환경 각주.** diff·done-check 등 증거 수집 명령은 편집에 쓴 도구와 같은 경로 기준으로 실행하고, 불일치가 의심되면 Read로 재확인한다.
+**Claim-strength contract: evidence strength caps claim strength.** 각 claim은 다음 네 status 중 하나만 쓴다.
+
+- `VERIFIED` — 해당 claim의 예상 observable을 실제 실행해 관찰했다.
+- `INSPECTED` — diff/file/static state를 직접 관찰했지만 runtime behavior는 실행하지 않았다.
+- `UNVERIFIED` — 적합한 check를 실행하지 못했거나 필요한 환경이 없었다.
+- `FAILED` — 적합한 check가 실행됐고 예상 observable과 불일치했거나 check가 실패했다.
+
+Content/change/scope claim은 diff/file/static state에 관한 것이므로 `INSPECTED`에 둔다. Passing behavior test는 실행한 runtime behavior만 `VERIFIED`로 만들며, 편집 사실이나 변경 범위까지 `VERIFIED`로 승격하지 않는다.
+
+static inspection만으로 runtime claim을 `VERIFIED`라 하지 않는다. dry-run은 plan만 검증하며 applied state를 검증하지 않는다. 축소·대체 check는 원 claim을 승격하지 않고 실제로 관찰한 더 좁은 claim만 판정한다.
+
+evidence는 claim의 mutation/dependency set에 영향을 주는 마지막 mutation 이후의 parent-session observation이어야 한다. 단 관찰 source가 그 set 밖이고 관찰 뒤 package/version/config/environment 변화가 없으면 세션 내 앞선 직접 관찰을 `INSPECTED` evidence로 재사용할 수 있다. 이 예외로 runtime claim을 `VERIFIED`로 올리지 않는다.
+
+worker summary, 다른 LLM의 판정, 기억, 위치만 적은 citation은 evidence가 아니다. 위임 결과는 부모 세션이 diff와 해당 check를 다시 관찰해야 한다(parent re-observation). external write는 목적지 상태를 read-after-write로 관찰해야 하며 write 요청의 성공 응답만으로 applied state를 주장하지 않는다.
+
+각 evidence entry에는 exact command, 모호할 때 cwd, exit code, 판정에 필요한 verbatim output을 넣는다. 같은 경로 기준으로 diff와 check를 실행하고 불일치가 의심되면 파일을 다시 읽는다. 기존 identifier·path·flag, impact/caller, wiring/entrypoint claim도 실제 정의·사용처·entrypoint 관찰에 연결한다.
 
 ## 5. 막혔을 때 — 같은 문을 세 번 두드리지 않는다
 
@@ -108,14 +151,16 @@ cross-verify: 해당 없음 (§6 트리거 모두 불충족)
 
 ## 6. 외부 검증 — 자기 가중치의 맹점 밖으로
 
-자기검토는 자기 가중치의 맹점을 벗어나지 못한다. 아래 신호가 하나라도 있으면 rubric 통과 후에도 /cross-verify(Codex 교차검증)를 사용자에게 제안한다(제안이지 자동 실행이 아니다).
+아래 신호가 하나라도 있으면 자기검토 뒤 `/cross-verify`를 제안한다. 자동 실행하지 않는다.
 
 - 비가역 작업이 포함된 변경 (마이그레이션, 대량 삭제, force push)
 - 보안·비용·PHI를 다루는 코드 경로
 - 3개 이상 파일에 걸친 구조 변경
-- 자기검토의 FAIL을 고쳤지만 수정의 파급 범위가 확신되지 않을 때
+- `FAILED` claim을 고쳤지만 수정의 파급 범위가 확신되지 않을 때
 
-무료 대안: fresh-context verifier subagent — 입력은 원요청 전문, R# 요구 목록, diff, done-check 명령뿐이다(빌더의 추론을 공유하면 맹점도 같이 공유된다). verifier의 "통과" 보고에도 §4를 그대로 적용한다 — 인용 없는 통과는 기각하고 재실행을 요구한다. (/cross-verify는 자체 프로토콜의 라운드별 공유 규칙을 따른다.)
+선택 패치(설치 시): 위 신호가 비가역·보안/비용/PHI·3+파일 등으로 무겁게 겹치면 `/cross-verify` 대신 `/deep-verify`를 제안할 수 있다.
+
+무료 대안은 fresh-context verifier다. 원요청, `Qn`/claim/expected observable, scoped diff/status, check 출력만 주고 빌더의 결론은 주지 않는다. verifier 결과에도 §4를 그대로 적용한다. `/cross-verify` 실행 중이면 그 프로토콜이 우선한다.
 
 finding 처리: 재현을 먼저 시도하고, 재현되면 재현 증거를 첨부해 수정 여부를 사용자에게 묻는다. 기각에는 반증 증거(코드 인용 또는 실행 출력)가 필요하다 — "그럴 것 같지 않다"는 기각 사유가 아니다. 정확성·명시 요구와 무관한 개선 제안은 고치지 않고 목록으로 전달한다. /cross-verify 실행 중이면 그 스킬의 합의 루프가 우선한다.
 
@@ -123,4 +168,4 @@ finding 처리: 재현을 먼저 시도하고, 재현되면 재현 증거를 첨
 
 메모리·harness가 이미 커버하는 규범(결정점 사용자 확인, 한국어 산문+영어 코드, 사실/추정 라벨, 잔여물 정리, git 규칙)은 재규정하지 않으며, 실제 충돌 시 그쪽이 우선한다. 우선권 발동에는 충돌하는 양쪽 문장의 인용이 필요하다 — 인용 없는 충돌 주장은 무효다.
 
-분업: design-agent/implement-agent 워크플로우 실행 중에는 그 워크플로우의 자체 게이트·검증 계약이 절차를 지배하고, 이 스킬은 §4 증거·어휘 규칙만 적용한다(규모 판정·rubric 중복 작성 금지). 사용자가 /verify, /code-review, /cross-verify를 명시 호출하면 그 스킬의 절차가 우선한다.
+분업: design-agent/implement-agent 워크플로우의 자체 게이트·검증 계약이 절차를 지배하고, 이 스킬은 §4 claim-strength 계약만 적용한다. 사용자가 `/verify`, `/code-review`, `/cross-verify`를 명시 호출하면 그 절차가 우선한다.
