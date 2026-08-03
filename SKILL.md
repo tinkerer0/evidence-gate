@@ -1,6 +1,6 @@
 ---
 name: evidence-gate
-description: "Mandatory gate for any turn that creates or modifies files, runs a state-changing command or tool call (incl. MCP writes and delegated work), or claims work status — however trivial (body scales LIGHT vs FULL). Includes approval turns green-lighting planned work (ㅇㅋ, 진행해, do it) and continuation/post-compaction turns that resume work or claim status (계속, resume). If a read-only turn becomes an edit, load before the first mutation. Not for pure questions or research with no change and no status claim."
+description: "Explicit-invocation-only verification procedure — auto-fire was retired 2026-08-03; ordinary turns follow the always-on honesty contract in the global CLAUDE.md instead. Load only when the user invokes /evidence-gate, or when a referencing skill or the user needs the full machinery: §1 scale ruling (LIGHT/FULL), §2 done-check ladder and four anchors, §4 claim-strength contract, §5 2-strike diagnosis, §6 external-verification routing. Do not auto-load for edits, status claims, or approval turns."
 ---
 
 # evidence-gate — 초안은 제출물이 아니라 검토 대상이다
@@ -9,7 +9,7 @@ description: "Mandatory gate for any turn that creates or modifies files, runs a
 
 모든 판정은 아티팩트(명령 출력, exit code, diff, 파일:라인)가 내린다. 문장은 claim을 아티팩트에 연결할 뿐이다.
 
-보고 끝의 ledger는 **기계 검증 대상**이다. Stop hook(`hooks/eg_audit.py`)이 세션 기록과 대조해 인용한 command의 실행 여부, 인용 줄의 실존, 마지막 mutation 이후인지, 위임 결과를 증거로 쓰지 않았는지를 확인한다. 지어낸 증거는 규범 위반이 아니라 **검출**된다.
+보고 끝의 ledger는 **기계 대조 가능한 형식**을 유지한다 — 인용한 command와 출력 줄은 세션 기록과 사후 대조할 수 있어야 한다. 단 자동 판정층은 현재 없다: 동봉된 `hooks/eg_audit.py`(ledger 텍스트 파싱 Stop hook)는 적대 게이밍 실측 13/13 우회로 **폐기**됐고 hook에 등록된 적 없다 — 모델이 쓴 텍스트를 파싱하는 검사는 검사 대상이 그 텍스트를 100% 통제해 우회가 무한하다(부정결과 기록: 이 repo 히스토리와 `docs/DESIGN_declare_enforce_split.md`). 위조 억지는 이 스킬이 아니라 상시 정직성 계약(전역 CLAUDE.md)과 transcript 소급 감사가 담당한다.
 
 세션 내 재로드 불요 — 본문이 컨텍스트에 있으면 로드 없이 따른다. 단 compaction 요약을 거쳤거나 resume으로 시작한 세션이면 이후 첫 게이트 적용 턴에 1회 재로드하고, 그 외에도 §2 done-check 사다리 5단을 원문으로 인용할 수 없으면 유실로 간주해 재로드한다. 지각 로드·유실 후 재로드는 면제가 아니다 — 소급 기준은 §1 래칫을 따른다.
 

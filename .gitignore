@@ -12,3 +12,6 @@ id_rsa
 # Logs / temp
 *.log
 *.tmp
+
+# Python
+__pycache__/
