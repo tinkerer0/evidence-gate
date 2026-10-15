@@ -1,5 +1,10 @@
 # evidence-gate
 
+> **보관용** — 사용을 종료한 Claude Code 스킬의 문서·절차를 보존합니다. 아래 내용은 당시 버전 기준입니다.
+
+<details>
+<summary>기존 설명과 사용법</summary>
+
 Claude Code(및 Claude Agent SDK) 세션용 품질 게이트 스킬입니다. 파일·상태를 바꾸거나 작업 상태를 주장하는 턴에서 **작업 규모와 변경 귀속을 먼저 고정**하고, 모든 claim을 **claim-specific evidence**에 연결합니다.
 
 핵심 명제는 *"초안은 제출물이 아니라 검토 대상이다"* 이고, 출발점은 *"자기보고는 품질 신호가 아니다"* 입니다 — "확인했습니다"라고 쓰는 비용이 실제 확인 비용보다 훨씬 싸기 때문입니다. 그래서 모든 통과 판정은 진술이 아니라 아티팩트(명령 출력, exit code, diff, 파일:라인)가 내리고, 문장은 그 아티팩트를 인용하는 역할만 합니다.
@@ -83,3 +88,5 @@ Claude Code 스킬이므로 `SKILL.md`를 스킬 디렉토리에 두면 됩니�
 ## License
 
 MIT — [LICENSE](LICENSE) 참고.
+
+</details>
